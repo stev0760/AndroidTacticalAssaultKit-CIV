@@ -1,0 +1,25 @@
+# Build environment for ATAK-CIV 4.6 (NDK r12b / JDK 8 / Conan 1.x era)
+FROM docker.io/library/ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC LANG=C.UTF-8
+
+RUN apt-get -o APT::Sandbox::User=root update && \
+    apt-get -o APT::Sandbox::User=root install -y --no-install-recommends \
+      openjdk-8-jdk-headless ant swig tcl autoconf automake libtool \
+      g++ make cmake ninja-build pkg-config patch patchelf dos2unix jq \
+      p7zip-full zip unzip apg file git git-lfs curl wget ca-certificates \
+      python3 python3-pip python3-venv perl xz-utils bzip2 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir 'conan<2' && conan --version
+
+ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64 \
+    ANDROID_SDK_ROOT=/opt/android/sdk \
+    ANDROID_HOME=/opt/android/sdk \
+    ANDROID_NDK=/opt/android/android-ndk-r12b \
+    ANDROID_NDK_HOME=/opt/android/android-ndk-r12b
+
+WORKDIR /src
+
+# ant pulls in JDK 11 as a dependency; force JDK 8 (javah, -source 1.6, Gradle 6.9)
+ENV PATH=/usr/lib/jvm/java-8-openjdk-amd64/bin:$PATH

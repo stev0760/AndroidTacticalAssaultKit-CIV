@@ -20,7 +20,7 @@ task configureConan {
     doLast {
         // XXX - fallback on legacy property names, remove support in future version
         def conanRepoUrl = getProperty(project, 'takRepoConanUrl',
-                getProperty(project, 'conan.consume.url', 'http://localhost'))
+                getProperty(project, 'conan.consume.url', null))
         def conanRepoUser = getProperty(project, 'takRepoUsername',
                 getProperty(project, 'conan.consume.user', 'invalid'))
         def conanRepoPassword = getProperty(project, 'takRepoPassword',

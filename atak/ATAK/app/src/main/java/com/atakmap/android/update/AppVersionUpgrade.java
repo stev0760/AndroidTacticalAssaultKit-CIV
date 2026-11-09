@@ -42,6 +42,16 @@ public class AppVersionUpgrade {
 
     private static final String TAG = "AppVersionUpgrade";
 
+    /**
+     * Bump whenever the map sources bundled under assets/wms change so that
+     * existing installs pick up the new set on the next launch.
+     */
+    private static final int WMS_SOURCES_VERSION = 2;
+
+    /** Layer name (the <name> element) selected on first launch. */
+    private static final String DEFAULT_MOBILE_LAYER = "Esri World Imagery";
+    private static final String WMS_SOURCES_VERSION_KEY = "wms_sources_version";
+
     public static boolean OVERLAYS_MIGRATED = false;
 
     /**
@@ -113,7 +123,9 @@ public class AppVersionUpgrade {
         if (fp != null)
             fp.deployDocumentation();
 
-        if (!prefs.getBoolean("wms_deployed", false) || redeploy) {
+        if (!prefs.getBoolean("wms_deployed", false) || redeploy
+                || prefs.getInt(WMS_SOURCES_VERSION_KEY,
+                        0) < WMS_SOURCES_VERSION) {
             // make sure the WMS sources actually are redeployed
             prefs.edit().putBoolean("wms_deployed", false).apply();
             _removeWMSSource("mapquest-map.xml");
@@ -121,39 +133,42 @@ public class AppVersionUpgrade {
             _removeWMSSource("DigitalGlobe-G-EGD_MostAesthetic.xmle");
             _removeWMSSource("DigitalGlobe-G-EGD_MostCurrent.xmle");
             _removeWMSSource("DigitalGlobe-G-EGD_LeastClouds.xmle");
+            // services that have been retired upstream
+            _removeWMSSource("NOAA_RNC.xml");
+            _removeWMSSource("NRL-FAA-TACs.xml");
+            _removeWMSSource("NRL-FAA-WACs.xml");
 
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NOAA_RNC.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "USGSImageryOnly.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "USGSImageryTopo.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-DRG-Auto.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-DRG-Mosaic.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-FAA-Sectionals.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-FAA-TACs.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-FAA-WACs.xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-NAIP-(CONUS).xml");
-            _copyWMSSource(context.getApplicationContext(), prefs,
-                    "NRL-OpenStreetMap.xml");
+            // deploy every map source bundled under assets/wms
+            String[] sources = null;
+            try {
+                sources = context.getAssets().list("wms");
+            } catch (IOException e) {
+                Log.e(TAG, "unable to list bundled map sources", e);
+            }
+            if (sources != null) {
+                for (String source : sources)
+                    _copyWMSSource(context.getApplicationContext(), prefs,
+                            source);
+            }
+            prefs.edit().putInt(WMS_SOURCES_VERSION_KEY, WMS_SOURCES_VERSION)
+                    .apply();
 
             if (fp != null)
                 fp.deployWMSPointers();
 
             final String active = prefs.getString("lastViewedLayer.active",
                     null);
-            if (active == null) {
-                // ATAK-14138 - Default to OpenStreetMap
+            final String selected = prefs.getString(
+                    "MobileLayerSelectionAdapter.selected", null);
+            // Default to satellite imagery. Also migrate installs still
+            // carrying the stock "NRL-OpenStreetMap" default, which never
+            // matched a layer name and renders as a pale globe when zoomed out.
+            if (active == null || selected == null
+                    || "NRL-OpenStreetMap".equals(selected)) {
                 SharedPreferences.Editor e = prefs.edit();
                 e.putString("lastViewedLayer.active", "Mobile");
                 e.putString("MobileLayerSelectionAdapter.selected",
-                        "NRL-OpenStreetMap");
+                        DEFAULT_MOBILE_LAYER);
                 e.apply();
             }
 
